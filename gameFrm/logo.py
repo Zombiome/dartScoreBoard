@@ -34,7 +34,14 @@ class LogoScreen(tk.Tk):
         label.pack(expand=True)
 
         self.bind("<Key>", self._close)
+
+        # Force the window manager to actually activate this window
+        # (a fresh Tk() window doesn't always get OS-level keyboard
+        # focus right away, especially on Windows).
+        self.lift()
+        self.attributes("-topmost", True)
         self.focus_force()
+        self.after(300, lambda: self.attributes("-topmost", False))
 
         self.after(duration_ms, self._close)
 

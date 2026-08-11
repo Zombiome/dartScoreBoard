@@ -23,7 +23,16 @@ class Launcher(tk.Tk):
         self.title("Chavannes Darts Association - ScoreBoard")
         self.configure(background="black")
         self.attributes("-fullscreen", True)
+
+        # A freshly created Tk() window isn't always given OS-level
+        # keyboard focus right away (especially on Windows), which is
+        # why the app could open behind whatever had focus before.
+        # Briefly forcing "always on top" makes the window manager
+        # actually activate it, then we release that flag again.
+        self.lift()
+        self.attributes("-topmost", True)
         self.focus_force()
+        self.after(300, lambda: self.attributes("-topmost", False))
 
         # Global safety exit: Escape quits the app, unless a screen
         # (e.g. new player entry) intercepts it first with "break".

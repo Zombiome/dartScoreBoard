@@ -12,7 +12,6 @@ LOGO_PATH = os.path.join(
     "logo.png",
 )
 
-
 class LogoScreen(tk.Tk):
     """
     Fullscreen splash screen showing the application logo.

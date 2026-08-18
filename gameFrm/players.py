@@ -58,3 +58,25 @@ class PlayerRegistry:
         self._players.append(pseudo)
         self._save()
         return pseudo
+
+    def rename_player(self, old_pseudo, new_pseudo):
+        """
+        Rename a registered player. Raises ValueError if the old pseudo
+        doesn't exist, the new one is empty, or it's already taken by
+        a different player (renaming to the same name, possibly with
+        different casing, is allowed).
+        """
+        if old_pseudo not in self._players:
+            raise ValueError(f"Le joueur '{old_pseudo}' n'existe pas.")
+
+        new_pseudo = new_pseudo.strip()
+        if not new_pseudo:
+            raise ValueError("Le pseudo ne peut pas être vide.")
+
+        if new_pseudo.lower() != old_pseudo.lower() and self.exists(new_pseudo):
+            raise ValueError(f"Le joueur '{new_pseudo}' existe déjà.")
+
+        index = self._players.index(old_pseudo)
+        self._players[index] = new_pseudo
+        self._save()
+        return new_pseudo

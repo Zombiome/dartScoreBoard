@@ -12,8 +12,9 @@ from gameFrm.playerSetup import PlayerCountScreen, PlayerSelectScreen
 from gameFrm.playerOrder import PlayerOrderScreen
 from gameFrm.gameTypeSetup import GameTypeScreen
 from gameFrm.ruleModeSetup import RuleModeScreen
-from gameFrm.game301 import Game301, GAME_MODES, STARTING_SCORES
-from gameFrm.game301Screen import Game301Screen
+from gameFrm.countdownGame import CountdownGame, GAME_MODES, STARTING_SCORES
+from gameFrm.countdownScreen import CountdownScreen
+from gameFrm.stats import record_game
 
 
 class Launcher(tk.Tk):
@@ -109,7 +110,7 @@ class Launcher(tk.Tk):
         self.rule_mode = mode_label
         rules = GAME_MODES[mode_label]
 
-        self.game = Game301(
+        self.game = CountdownGame(
             self.selected_players,
             in_rule=rules["in_rule"],
             out_rule=rules["out_rule"],
@@ -117,7 +118,7 @@ class Launcher(tk.Tk):
         )
 
         self._set_frame(
-            Game301Screen,
+            CountdownScreen,
             game=self.game,
             mode_label=mode_label,
             game_label=self.game_type,
@@ -127,6 +128,7 @@ class Launcher(tk.Tk):
 
     def _on_game_over(self, winner_name):
         print(f"Partie terminée, vainqueur : {winner_name}")
+        record_game(self.game, game_type=self.game_type, rule_mode=self.rule_mode)
 
     def _request_restart(self):
         """

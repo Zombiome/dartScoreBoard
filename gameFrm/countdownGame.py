@@ -19,8 +19,10 @@ OUT_RULES = ("straight", "double", "master")
 
 # The game offers a single "rule mode" choice to the player : each
 # label constrains either the opening or the finish, the other side
-# staying "straight" (no constraint).
+# staying "straight" (no constraint). "Jeu simple" has no constraint
+# on either side (no Double/Master IN or OUT) and is listed first.
 GAME_MODES = {
+    "Jeu simple": {"in_rule": "straight", "out_rule": "straight"},
     "Double IN": {"in_rule": "double", "out_rule": "straight"},
     "Master IN": {"in_rule": "master", "out_rule": "straight"},
     "Double OUT": {"in_rule": "straight", "out_rule": "double"},
@@ -77,13 +79,42 @@ class PlayerState:
         self.opened = False
         self.winner = False
 
+        # Raw stats accumulated for this single game only ; read by
+        # gameFrm.stats once the game is over to update the player's
+        # persistent performance file.
+        self.turns_points = []  # raw point total of each completed turn
+        self.dart_hits = {}     # "miss" -> n ; "1".."20"/"25" -> {"single","double","triple"}
 
-class Game301:
+    def record_dart(self, throw):
+        """Track one physical dart landing, regardless of bust/counted status."""
+        if throw.value == 0:
+            self.dart_hits["miss"] = self.dart_hits.get("miss", 0) + 1
+            return
+        mult_key = {1: "single", 2: "double", 3: "triple"}[throw.multiplier]
+        zone = self.dart_hits.setdefault(
+            str(throw.value), {"single": 0, "double": 0, "triple": 0}
+        )
+        zone[mult_key] += 1
+
+    def undo_dart(self, throw):
+        """Reverse the effect of `record_dart` for the dart being undone."""
+        if throw.value == 0:
+            if self.dart_hits.get("miss"):
+                self.dart_hits["miss"] -= 1
+            return
+        mult_key = {1: "single", 2: "double", 3: "triple"}[throw.multiplier]
+        zone = self.dart_hits.get(str(throw.value))
+        if zone and zone.get(mult_key):
+            zone[mult_key] -= 1
+
+
+class CountdownGame:
     """
     Turn-based rule engine : players throw 3 darts per turn, the score
     counts down from `starting_score` to exactly 0 following the
     chosen IN / OUT rule. Handles bust detection with the official
-    "revert to start-of-turn score" behaviour.
+    "revert to start-of-turn score" behaviour. Used for 301, 501, and
+    any other countdown variant sharing the same rules.
     """
 
     def __init__(self, player_names, in_rule="straight", out_rule="straight",
@@ -143,6 +174,7 @@ class Game301:
                 counted = False
 
         self.current_turn_throws.append(throw)
+        player.record_dart(throw)
 
         if counted:
             candidate = player.score - throw.points
@@ -158,6 +190,7 @@ class Game301:
         if bust:
             player.score = self._turn_start_score
             player.opened = self._turn_start_opened
+            self._commit_turn_points(player)
             self._end_turn()
             return {
                 "status": "bust",
@@ -173,6 +206,7 @@ class Game301:
         if candidate == 0:
             player.winner = True
             self.winner = player
+            self._commit_turn_points(player)
             return {
                 "status": "win",
                 "player_name": player.name,
@@ -184,6 +218,7 @@ class Game301:
 
         turn_over = len(self.current_turn_throws) >= 3
         if turn_over:
+            self._commit_turn_points(player)
             self._end_turn()
 
         return {
@@ -204,8 +239,9 @@ class Game301:
         if not self.current_turn_throws:
             return False
 
-        self.current_turn_throws.pop()
+        removed = self.current_turn_throws.pop()
         player = self.current_player
+        player.undo_dart(removed)
         player.score = self._turn_start_score
         player.opened = self._turn_start_opened
 
@@ -218,6 +254,16 @@ class Game301:
             player.score -= t.points
 
         return True
+
+    def _commit_turn_points(self, player):
+        """
+        Record the raw point total of the turn that is about to end
+        (sum of every dart thrown this visit, bust or not) : this is
+        what gameFrm.stats uses to compute the per-game scoring
+        average and the best single-turn score.
+        """
+        raw_points = sum(t.points for t in self.current_turn_throws)
+        player.turns_points.append(raw_points)
 
     def _end_turn(self):
         self.current_turn_throws = []

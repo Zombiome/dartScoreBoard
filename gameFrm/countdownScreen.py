@@ -1,9 +1,9 @@
 # Author : Corentin Bondallaz
 # Date : 11.08.2026
-# Description : Score entry screen for a 301 game. Shows every
-#               player's current score, highlights whose turn it is,
-#               and captures the 3 darts of each turn from the
-#               keyboard : digits for the value (0-20, 25 = bull),
+# Description : Score entry screen for a countdown game (301, 501, ...).
+#               Shows every player's current score, highlights whose
+#               turn it is, and captures the 3 darts of each turn from
+#               the keyboard : digits for the value (0-20, 25 = bull),
 #               "D" prefix for a double, "T" prefix for a triple,
 #               Enter to validate a throw, Backspace to correct.
 
@@ -11,7 +11,7 @@ import math
 import random
 import tkinter as tk
 
-from gameFrm.game301 import build_throw
+from gameFrm.countdownGame import build_throw
 
 INSTRUCTIONS = (
     "Chiffres : valeur (0-20, 25 = bull)   ·   D : double   ·   T : triple\n"
@@ -25,7 +25,7 @@ CONFETTI_COUNT = 110
 FIREWORK_BURSTS = 5
 
 
-class Game301Screen(tk.Frame):
+class CountdownScreen(tk.Frame):
     def __init__(self, master, game, on_game_over, on_restart, mode_label=None, game_label="301"):
         super().__init__(master, background="black")
         self.game = game

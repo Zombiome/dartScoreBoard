@@ -46,11 +46,10 @@ class PlayerSelectScreen(tk.Frame):
         super().__init__(master, background="black")
         self.registry = registry
         self.on_select = on_select
+        self.already_selected = already_selected
+        self._renaming_pseudo = None  # None => creating ; else renaming this pseudo
 
-        available = [
-            p for p in registry.list_players() if p not in already_selected
-        ]
-        self.items = available + [NEW_PLAYER_LABEL]
+        self.items = self._available_items()
 
         tk.Label(
             self,
@@ -105,22 +104,27 @@ class PlayerSelectScreen(tk.Frame):
 
         self.listbox.bind("<Return>", self._on_list_confirm)
         self.listbox.bind("<KP_Enter>", self._on_list_confirm)
+        self.listbox.bind("<Key>", self._on_list_key)
 
         tk.Label(
             self.list_frame,
-            text="↑ / ↓ pour naviguer   ·   Entrée pour valider",
+            text="↑ / ↓ pour naviguer   ·   Entrée pour valider   ·   R pour renommer",
             font=("Helvetica", 14),
             fg="grey",
             background="black",
         ).pack(pady=(30, 0))
 
-        # --- entry mode : type the pseudo of a new player ---
+        # --- entry mode : type a pseudo, either for a new player or
+        # to rename the one currently highlighted in the list ---
+        self.entry_title_var = tk.StringVar()
         tk.Label(
             self.entry_frame,
-            text="Nouveau joueur — entre le pseudo :",
+            textvariable=self.entry_title_var,
             font=("Helvetica", 20),
             fg="white",
             background="black",
+            wraplength=800,
+            justify="center",
         ).pack(pady=(30, 10))
 
         self.new_name_var = tk.StringVar()
@@ -137,9 +141,9 @@ class PlayerSelectScreen(tk.Frame):
             highlightcolor="#3366cc",
         )
         self.entry.pack(pady=10, ipadx=10, ipady=5)
-        self.entry.bind("<Return>", self._on_create_confirm)
-        self.entry.bind("<KP_Enter>", self._on_create_confirm)
-        self.entry.bind("<Escape>", self._on_create_cancel)
+        self.entry.bind("<Return>", self._on_entry_confirm)
+        self.entry.bind("<KP_Enter>", self._on_entry_confirm)
+        self.entry.bind("<Escape>", self._on_entry_cancel)
 
         self.error_var = tk.StringVar()
         tk.Label(
@@ -160,17 +164,43 @@ class PlayerSelectScreen(tk.Frame):
 
         self._show_list_mode()
 
-    def _show_list_mode(self):
+    def _available_items(self):
+        available = [
+            p for p in self.registry.list_players() if p not in self.already_selected
+        ]
+        return available + [NEW_PLAYER_LABEL]
+
+    def _show_list_mode(self, select_value=None):
         self.entry_frame.pack_forget()
         self.list_frame.pack(fill="both", expand=True)
         self.listbox.focus_set()
 
+        if select_value is not None:
+            self.items = self._available_items()
+            self.listbox.delete(0, tk.END)
+            for item in self.items:
+                self.listbox.insert(tk.END, item)
+
+            index = self.items.index(select_value) if select_value in self.items else 0
+            self.listbox.selection_set(index)
+            self.listbox.activate(index)
+            self.listbox.see(index)
+
     def _show_entry_mode(self):
         self.list_frame.pack_forget()
         self.error_var.set("")
-        self.new_name_var.set("")
+
+        if self._renaming_pseudo is not None:
+            self.entry_title_var.set(f"Renommer « {self._renaming_pseudo} » — nouveau pseudo :")
+            self.new_name_var.set(self._renaming_pseudo)
+        else:
+            self.entry_title_var.set("Nouveau joueur — entre le pseudo :")
+            self.new_name_var.set("")
+
         self.entry_frame.pack(fill="both", expand=True)
         self.entry.focus_set()
+        self.entry.icursor(tk.END)
+        self.entry.selection_range(0, tk.END)
 
     def _on_list_confirm(self, event=None):
         selection = self.listbox.curselection()
@@ -178,21 +208,43 @@ class PlayerSelectScreen(tk.Frame):
             return "break"
         value = self.listbox.get(selection[0])
         if value == NEW_PLAYER_LABEL:
+            self._renaming_pseudo = None
             self._show_entry_mode()
         else:
             self.on_select(value)
         return "break"
 
-    def _on_create_confirm(self, event=None):
+    def _on_list_key(self, event):
+        if event.keysym.lower() == "r":
+            selection = self.listbox.curselection()
+            if selection:
+                value = self.listbox.get(selection[0])
+                if value != NEW_PLAYER_LABEL:
+                    self._renaming_pseudo = value
+                    self._show_entry_mode()
+            return "break"
+        return None
+
+    def _on_entry_confirm(self, event=None):
         pseudo = self.new_name_var.get().strip()
+
         try:
-            self.registry.add_player(pseudo)
+            if self._renaming_pseudo is not None:
+                pseudo = self.registry.rename_player(self._renaming_pseudo, pseudo)
+            else:
+                self.registry.add_player(pseudo)
         except ValueError as exc:
             self.error_var.set(str(exc))
             return "break"
-        self.on_select(pseudo)
+
+        if self._renaming_pseudo is not None:
+            self._renaming_pseudo = None
+            self._show_list_mode(select_value=pseudo)
+        else:
+            self.on_select(pseudo)
         return "break"
 
-    def _on_create_cancel(self, event=None):
+    def _on_entry_cancel(self, event=None):
+        self._renaming_pseudo = None
         self._show_list_mode()
         return "break"

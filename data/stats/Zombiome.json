@@ -1,8 +1,8 @@
 {
   "pseudo": "Zombiome",
-  "games_played": 1,
+  "games_played": 0,
   "games_won": 0,
-  "best_turn_score": 9,
+  "best_turn_score": 0,
   "dart_hits": {
     "miss": 0,
     "1": {
@@ -16,7 +16,7 @@
       "triple": 0
     },
     "3": {
-      "single": 6,
+      "single": 0,
       "double": 0,
       "triple": 0
     },
@@ -111,21 +111,5 @@
       "triple": 0
     }
   },
-  "history": [
-    {
-      "date": "2026-08-18T21:06:28",
-      "game_type": "301",
-      "rule_mode": "Jeu simple",
-      "opponents": [
-        "Kiki",
-        "DokminaBot",
-        "Foret Noire"
-      ],
-      "result": "loss",
-      "turns_played": 2,
-      "points_scored": 18,
-      "average": 9.0,
-      "best_turn": 9
-    }
-  ]
+  "history": []
 }

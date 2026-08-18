@@ -7,7 +7,7 @@
 
 import tkinter as tk
 
-from gameFrm.keyboardMenu import KeyboardMenu
+from gameFrm.keyboardMenu import KeyboardMenu, DEFAULT_INSTRUCTIONS
 
 MIN_PLAYERS = 1
 MAX_PLAYERS = 8
@@ -18,12 +18,19 @@ NEW_PLAYER_LABEL = "+ Nouveau joueur"
 
 class PlayerCountScreen(KeyboardMenu):
     """
-    Ask how many players will take part in the game.
+    Ask how many players will take part in the game. Also the app's
+    entry point for the statistics dashboard : pressing S opens the
+    player-selection screen for browsing recorded performance graphs,
+    without disturbing the normal Up/Down/Enter flow of this menu.
     """
 
-    def __init__(self, master, on_confirm):
+    def __init__(self, master, on_confirm, on_stats=None):
         items = [str(n) for n in range(MIN_PLAYERS, MAX_PLAYERS + 1)]
         initial_index = items.index(str(DEFAULT_PLAYER_COUNT))
+
+        instructions = DEFAULT_INSTRUCTIONS
+        if on_stats is not None:
+            instructions += "   ·   S : statistiques"
 
         super().__init__(
             master,
@@ -31,7 +38,18 @@ class PlayerCountScreen(KeyboardMenu):
             items=items,
             on_confirm=lambda value: on_confirm(int(value)),
             initial_index=initial_index,
+            instructions=instructions,
         )
+
+        self.on_stats = on_stats
+        if self.on_stats is not None:
+            self.listbox.bind("<Key>", self._on_extra_key)
+
+    def _on_extra_key(self, event):
+        if event.keysym.lower() == "s":
+            self.on_stats()
+            return "break"
+        return None
 
 
 class PlayerSelectScreen(tk.Frame):

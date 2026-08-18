@@ -15,12 +15,16 @@
 #                 - the win rate (games_won / games_played) ;
 #                 - the number of darts landed in each zone (1-20 and
 #                   25), split into single/double/triple, across every
-#                   game ever played.
+#                   game ever played (each history entry also keeps its
+#                   own game's dart hits, so the per-zone counts can be
+#                   charted over time, not just as a lifetime total).
 #
 #               Pure data layer, no UI : `record_game` is called once a
-#               CountdownGame has a winner, display screens can be
-#               built later on top of `load_stats` / `win_rate`.
+#               CountdownGame has a winner ; `build_graphs` turns a
+#               loaded stats dict into ready-to-plot time series (X
+#               axis always the game's date) for gameFrm.statsScreen.
 
+import copy
 import json
 import os
 from datetime import datetime
@@ -139,6 +143,110 @@ def record_game(game, game_type, rule_mode):
             "points_scored": points_scored,
             "average": average,
             "best_turn": best_turn_this_game,
+            # Snapshot of this single game's dart hits (as opposed to
+            # `stats["dart_hits"]`, which is the running total) : this
+            # is what lets build_graphs() plot each zone's count over
+            # time instead of only ever showing the lifetime total.
+            "dart_hits": copy.deepcopy(player.dart_hits),
         })
 
         save_stats(player.name, stats)
+
+
+def _parse_date(iso_str):
+    return datetime.fromisoformat(iso_str)
+
+
+def build_graphs(stats):
+    """
+    Turn a player's stats dict (as returned by load_stats) into an
+    ordered list of chart-ready graphs, in the exact order they should
+    be browsed : scoring average, personal best turn (running record),
+    win rate, then one graph per dart zone (1 to 20, then bull's eye).
+    X axis is always the date/time of the game.
+
+    Each graph is a dict :
+        {"key": str, "title": str, "unit": str,
+         "series": [{"label": str, "points": [(datetime, value), ...]}]}
+
+    Returns an empty list if the player has no recorded game yet.
+    """
+    history = stats.get("history", [])
+    if not history:
+        return []
+
+    dated_history = sorted(
+        ({**entry, "_date": _parse_date(entry["date"])} for entry in history),
+        key=lambda e: e["_date"],
+    )
+
+    graphs = [
+        {
+            "key": "average",
+            "title": "Moyenne de points par partie",
+            "unit": "pts / tour",
+            "series": [{
+                "label": "Moyenne",
+                "points": [(e["_date"], e["average"]) for e in dated_history],
+            }],
+        },
+    ]
+
+    # Best turn score : running record across every game played so far.
+    running_best = 0
+    best_points = []
+    for e in dated_history:
+        running_best = max(running_best, e.get("best_turn", 0))
+        best_points.append((e["_date"], running_best))
+    graphs.append({
+        "key": "best_turn_record",
+        "title": "Meilleur tour (record, toutes parties confondues)",
+        "unit": "pts",
+        "series": [{"label": "Record", "points": best_points}],
+    })
+
+    # Win rate : running percentage across every game played so far.
+    played = 0
+    won = 0
+    rate_points = []
+    for e in dated_history:
+        played += 1
+        if e.get("result") == "win":
+            won += 1
+        rate_points.append((e["_date"], round(100 * won / played, 1)))
+    graphs.append({
+        "key": "win_rate",
+        "title": "Pourcentage de parties gagnées",
+        "unit": "%",
+        "series": [{"label": "Victoires", "points": rate_points}],
+    })
+
+    # Dart hits per zone, running total across every game, one graph
+    # per zone (1..20, then bull's eye), single/double/(triple) split.
+    running_totals = {zone: {"single": 0, "double": 0, "triple": 0} for zone in DART_ZONES}
+    per_zone_points = {zone: {"single": [], "double": [], "triple": []} for zone in DART_ZONES}
+    for e in dated_history:
+        game_hits = e.get("dart_hits", {})
+        for zone in DART_ZONES:
+            zone_hits = game_hits.get(zone, {})
+            for mult in ("single", "double", "triple"):
+                running_totals[zone][mult] += zone_hits.get(mult, 0)
+                per_zone_points[zone][mult].append((e["_date"], running_totals[zone][mult]))
+
+    for zone in DART_ZONES:
+        series = [
+            {"label": "Simple", "points": per_zone_points[zone]["single"]},
+            {"label": "Double", "points": per_zone_points[zone]["double"]},
+        ]
+        if zone != "25":
+            series.append({"label": "Triple", "points": per_zone_points[zone]["triple"]})
+
+        zone_name = "bull's eye" if zone == "25" else zone
+        graphs.append({
+            "key": f"zone_{zone}",
+            "title": f"Fléchettes dans le {zone_name}",
+            "unit": "fléchettes (cumulé)",
+            "series": series,
+        })
+
+    return graphs

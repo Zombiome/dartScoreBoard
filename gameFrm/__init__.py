@@ -9,3 +9,4 @@ from .countdownGame import *
 from .ruleModeSetup import *
 from .countdownScreen import *
 from .stats import *
+from .statsScreen import *

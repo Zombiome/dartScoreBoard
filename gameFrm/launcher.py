@@ -15,6 +15,7 @@ from gameFrm.ruleModeSetup import RuleModeScreen
 from gameFrm.countdownGame import CountdownGame, GAME_MODES, STARTING_SCORES
 from gameFrm.countdownScreen import CountdownScreen
 from gameFrm.stats import record_game
+from gameFrm.statsScreen import StatsPlayerSelectScreen, StatsDashboardScreen
 
 
 class Launcher(tk.Tk):
@@ -59,7 +60,26 @@ class Launcher(tk.Tk):
         self._current_frame.pack(fill="both", expand=True)
 
     def _show_player_count_screen(self):
-        self._set_frame(PlayerCountScreen, on_confirm=self._start_player_selection)
+        self._set_frame(
+            PlayerCountScreen,
+            on_confirm=self._start_player_selection,
+            on_stats=self._show_stats_player_select,
+        )
+
+    def _show_stats_player_select(self):
+        self._set_frame(
+            StatsPlayerSelectScreen,
+            registry=self.registry,
+            on_select=self._show_stats_dashboard,
+            on_back=self._show_player_count_screen,
+        )
+
+    def _show_stats_dashboard(self, pseudo):
+        self._set_frame(
+            StatsDashboardScreen,
+            pseudo=pseudo,
+            on_back=self._show_stats_player_select,
+        )
 
     def _start_player_selection(self, nb_players):
         self.nb_players = nb_players
